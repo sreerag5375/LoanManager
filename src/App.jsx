@@ -42,15 +42,18 @@ const LoanManager = () => {
     return 'bg-red-500 border-red-600';
   };
 
-  // Get text color for contrast
-  const getTextColor = () => {
-    return 'text-white'; // All colors use white text for consistency
+  // Get gradient colors based on amount
+  const getGradientColors = (amount) => {
+    if (amount < 10000) return 'from-green-500 to-green-600';
+    if (amount < 30000) return 'from-yellow-500 to-yellow-600';
+    if (amount <= 100000) return 'from-orange-500 to-orange-600';
+    return 'from-red-500 to-red-600';
   };
 
   // Add/Edit loan function
   const saveLoan = (e) => {
     e.preventDefault();
-    
+
     if (!loanName.trim() || !loanAmount || parseFloat(loanAmount) <= 0) {
       alert('Please enter valid loan name and amount');
       return;
@@ -58,8 +61,8 @@ const LoanManager = () => {
 
     if (isEditMode && editingLoan) {
       // Update existing loan
-      setLoans(loans.map(loan => 
-        loan.id === editingLoan.id 
+      setLoans(loans.map(loan =>
+        loan.id === editingLoan.id
           ? { ...loan, name: loanName.trim(), amount: parseFloat(loanAmount) }
           : loan
       ));
@@ -116,130 +119,86 @@ const LoanManager = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Main Container - Centered */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        
+      <div className="max-w-6xl mx-auto px-4 py-8">
+
         {/* Header - Centered */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">{motivationalTitle}</h1>
-          <p className="text-gray-600">Track your progress towards financial freedom</p>
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">{motivationalTitle}</h1>
+          {/* Progress Indicator */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 bg-green-100  px-4 py-2 rounded-full border border-green-400">
+              <span className="font-medium">Focus on:</span>
+              <span className="font-bold">{sortedLoans[0]?.name}</span>
+              <span >₹{sortedLoans[0]?.amount.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Loan Pyramid Display */}
+        {/* Loan Rectangle Grid Display */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Debt Snowball Strategy</h2>
-            <p className="text-gray-500 text-sm">Pay off smallest loans first for quick wins and momentum</p>
-          </div>
-          
           {sortedLoans.length > 0 ? (
-            <div className="space-y-4">
-              {/* Progress Indicator */}
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full border border-blue-200">
-                  <span className="font-medium">Next Target:</span>
-                  <span className="font-bold">{sortedLoans[0]?.name}</span>
-                  <span className="text-blue-600">₹{sortedLoans[0]?.amount.toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-
-              {/* Pyramid Layout */}
-              <div className="flex flex-col items-center space-y-3">
-                {sortedLoans.map((loan, index) => {
-                  // Calculate width based on loan amount for true pyramid shape
-                  const maxAmount = Math.max(...sortedLoans.map(l => l.amount));
-                  const minAmount = Math.min(...sortedLoans.map(l => l.amount));
-                  const amountRange = maxAmount - minAmount;
-                  
-                  // Calculate proportional width (smallest: 200px, largest: 500px)
-                  const minWidth = 200;
-                  const maxWidth = 500;
-                  const widthRange = maxWidth - minWidth;
-                  
-                  let calculatedWidth;
-                  if (amountRange === 0) {
-                    calculatedWidth = minWidth; // All loans same amount
-                  } else {
-                    const ratio = (loan.amount - minAmount) / amountRange;
-                    calculatedWidth = minWidth + (ratio * widthRange);
-                  }
-
-                  return (
-                    <div
-                      key={loan.id}
-                      className={`${getLoanColor(loan.amount)} ${getTextColor()} 
-                                 rounded-lg border-2 shadow-md hover:shadow-lg transition-all duration-200 
-                                 transform hover:scale-105 p-4 relative group`}
-                      style={{ 
-                        width: `${calculatedWidth}px`,
-                        minWidth: '200px'
-                      }}
-                    >
-                      {/* Priority Badge */}
-                      {index === 0 && (
-                        <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full border-2 border-white shadow-sm">
-                          PRIORITY
-                        </div>
-                      )}
-
-                      {/* Edit/Delete Buttons - Show on Hover */}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            editLoan(loan);
-                          }}
-                          className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                          title="Edit loan"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            confirmDelete(loan);
-                          }}
-                          className="bg-white/20 hover:bg-red-500 backdrop-blur-sm text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                          title="Delete loan"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+            <div className="flex flex-col gap-4 max-w-md mx-auto">
+              {sortedLoans.map((loan, index) => (
+                <div key={loan.id} className="relative group">
+                  <div
+                    className={`bg-gradient-to-br ${getGradientColors(loan.amount)} relative flex flex-col justify-center text-white font-bold transition-all duration-200 hover:brightness-110 cursor-pointer rounded-lg border-2 ${getLoanColor(loan.amount).split(' ')[1]} p-6 h-32 shadow-lg hover:shadow-xl transform hover:scale-105`}
+                  >
+                    {/* Priority Badge for smallest loan */}
+                    {index === 0 && (
+                      <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                        Priority
                       </div>
-                      
-                      <div className="text-center">
-                        <div className="font-semibold text-lg mb-1">{loan.name}</div>
-                        <div className="text-2xl font-bold mb-1">₹{loan.amount.toLocaleString('en-IN')}</div>
-                        <div className="text-xs opacity-90">
-                          {index === 0 ? '🎯 Focus Here First!' : 
-                           index === 1 ? '📋 Next Up' : 
-                           `Position #${index + 1}`}
-                        </div>
+                    )}
+
+                    {/* Edit/Delete Buttons */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1 z-10">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          editLoan(loan);
+                        }}
+                        className="bg-black/40 hover:bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center transition-colors"
+                        title="Edit loan"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDelete(loan);
+                        }}
+                        className="bg-black/40 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center transition-colors"
+                        title="Delete loan"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="text-center">
+                      <div className="text-sm font-semibold mb-2 leading-tight drop-shadow">
+                        {loan.name}
+                      </div>
+                      <div className="text-xl font-bold drop-shadow">
+                        ₹{loan.amount.toLocaleString('en-IN')}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
 
-              {/* Strategy Tip */}
-              <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="text-blue-500 text-lg">💡</div>
-                  <div>
-                    <h4 className="font-medium text-blue-900 mb-1">Debt Snowball Tip</h4>
-                    <p className="text-blue-700 text-sm">
-                      Focus all extra payments on <strong>{sortedLoans[0]?.name}</strong> while making minimum payments on others. 
-                      Quick wins build momentum!
-                    </p>
+                    {/* Rank indicator */}
+                    <div className="absolute bottom-2 left-2 bg-black/30 text-white text-xs px-2 py-1 rounded-full">
+                      #{index + 1}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔺</div>
+              <div className="text-6xl mb-4">📋</div>
               <p className="text-gray-500 text-lg font-medium">No loans added yet</p>
               <p className="text-gray-400 text-sm mt-2">Click the + button to add your first loan</p>
             </div>
@@ -325,7 +284,7 @@ const LoanManager = () => {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={saveLoan} className="p-6">
+            <div className="p-6">
               <div className="space-y-4">
                 <div>
                   <label htmlFor="loanName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -339,7 +298,7 @@ const LoanManager = () => {
                     onChange={(e) => setLoanName(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     maxLength={50}
-                    required
+                    onKeyPress={(e) => e.key === 'Enter' && saveLoan(e)}
                   />
                 </div>
 
@@ -356,7 +315,7 @@ const LoanManager = () => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     min="0"
                     step="0.01"
-                    required
+                    onKeyPress={(e) => e.key === 'Enter' && saveLoan(e)}
                   />
                 </div>
               </div>
@@ -364,20 +323,19 @@ const LoanManager = () => {
               {/* Modal Footer */}
               <div className="flex gap-3 mt-6">
                 <button
-                  type="submit"
+                  onClick={saveLoan}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
                   {isEditMode ? 'Update Loan' : 'Save Loan'}
                 </button>
                 <button
-                  type="button"
                   onClick={closeModal}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -406,7 +364,7 @@ const LoanManager = () => {
               <p className="text-gray-700 mb-4">
                 Are you sure you want to delete <strong>"{deletingLoan.name}"</strong> with amount ₹{deletingLoan.amount.toLocaleString('en-IN')}?
               </p>
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={() => deleteLoan(deletingLoan.id)}
