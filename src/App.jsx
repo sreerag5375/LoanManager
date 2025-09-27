@@ -3,13 +3,14 @@ import React, { useState } from 'react';
 const LoanManager = () => {
   // Dynamic loan data
   const [loans, setLoans] = useState([
-    { id: 1, name: 'One card Loan', amount: 19152 },
-    { id: 2, name: 'Fed Credit card', amount: 26327 },
-    { id: 3, name: 'Mannarkkad loan', amount: 26400 },
-    { id: 4, name: 'Cred Loan 1', amount: 38276 },
-    { id: 5, name: 'Cred Loan 2', amount: 64440 },
+    { id: 1, name: 'One card Loan', amount: 15000 },
+    { id: 2, name: 'Fed Credit card', amount: 37800 },
+    { id: 2, name: 'ICICI Credit card', amount: 19000 },
+    { id: 3, name: 'Mannarkkad loan', amount: 24000 },
+    { id: 4, name: 'Cred Loan 1', amount: 32000 },
+    { id: 5, name: 'Cred Loan 2', amount: 58000 },
     { id: 6, name: 'Education Loan', amount: 139000 },
-    { id: 7, name: 'Marriage Loan', amount: 341390 }
+    { id: 7, name: 'Marriage Loan', amount: 335000 }
   ]);
 
   // Form state
