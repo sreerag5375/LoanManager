@@ -43,6 +43,7 @@ const LoanManager = () => {
     { id: 7, name: 'Education Loan', amount: 140000 },
     { id: 8, name: 'Marriage Loan', amount: 332500 },
     { id: 9, name: 'Kummatti fund', amount: 3000 },
+    { id: 10, name: 'Kudumbasree loan', amount: 23800 }
   ]);
 
   const [loanName, setLoanName] = useState('');
