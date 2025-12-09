@@ -35,7 +35,7 @@ const LoanManager = () => {
   // --- STATE ---
   const [loans, setLoans] = useState([
     { id: 1, name: 'One card Loan', amount: 12889 },
-    { id: 2, name: 'Fed Credit card', amount: 48704 },
+    { id: 2, name: 'Fed Credit card', amount: 41300 },
     { id: 3, name: 'ICICI Credit card', amount: 19950 },
     { id: 4, name: 'Mannarkkad loan', amount: 15400 },
     { id: 5, name: 'Cred Loan 1', amount: 21885 },
