@@ -37,17 +37,17 @@ const LoanDashboard = () => {
 
     // --- STATE ---
     const [loans, setLoans] = useState([
-        { id: 1, name: 'One card Loan', amount: 12889 },
-        { id: 2, name: 'Fed Credit card', amount: 41300 },
+        { id: 1, name: 'Kummatti fund', amount: 2000 },
+        { id: 2, name: 'Mannarkkad loan', amount: 15400 },
         { id: 3, name: 'ICICI Credit card', amount: 19950 },
-        { id: 4, name: 'Mannarkkad loan', amount: 15400 },
-        { id: 5, name: 'Cred Loan 1', amount: 21885 },
-        { id: 6, name: 'Cred Loan 2', amount: 54726 },
-        { id: 7, name: 'Education Loan', amount: 140000 },
-        { id: 8, name: 'Marriage Loan', amount: 332500 },
-        { id: 9, name: 'Kummatti fund', amount: 3000 },
-        { id: 10, name: 'Kudumbasree loan', amount: 23800 }
-    ]);
+        { id: 4, name: 'Cred Loan 1', amount: 21885 },
+        { id: 5, name: 'Kudumbasree loan', amount: 23800 },
+        { id: 6, name: 'Fed Credit card', amount: 41300 },
+        { id: 7, name: 'Cred Loan 2', amount: 54726 },
+        { id: 8, name: 'Education Loan', amount: 140000 },
+        { id: 9, name: 'Marriage Loan', amount: 332500 }
+    ]);               
+
 
     const [loanName, setLoanName] = useState('');
     const [loanAmount, setLoanAmount] = useState('');
