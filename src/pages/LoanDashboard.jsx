@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // --- Font & Custom Styles ---
@@ -36,17 +36,31 @@ const LoanDashboard = () => {
     const navigate = useNavigate();
 
     // --- STATE ---
-    const [loans, setLoans] = useState([
-        { id: 1, name: 'Kummatti fund', amount: 2500 },
-        { id: 2, name: 'Mannarkkad loan', amount: 12400 },
-        { id: 3, name: 'ICICI Credit card', amount: 18446 },
-        { id: 4, name: 'Cred Loan 1', amount: 13334 },
-        { id: 5, name: 'Kudumbasree loan', amount: 23800 },
-        { id: 6, name: 'Fed Credit card', amount: 52000 },
-        { id: 7, name: 'Cred Loan 2', amount: 49679 },
-        { id: 8, name: 'Education Loan', amount: 140000 },
-        { id: 9, name: 'Marriage Loan', amount: 332500 }
-    ]);               
+    const [loans, setLoans] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetchLoans();
+    }, []);
+
+    const fetchLoans = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/loans');
+            const json = await res.json();
+            if (json.success) {
+                setLoans(json.data);
+            } else {
+                setError(json.error);
+            }
+        } catch (err) {
+            setError('Failed to load loans');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
 
     const [loanName, setLoanName] = useState('');
@@ -89,21 +103,56 @@ const LoanDashboard = () => {
     };
 
     // --- CRUD FUNCTIONS ---
-    const saveLoan = (e) => {
+    const saveLoan = async (e) => {
         e.preventDefault();
         if (!loanName.trim() || !loanAmount || parseFloat(loanAmount) <= 0) return;
-        if (isEditMode && editingLoan) {
-            setLoans(loans.map(loan => loan.id === editingLoan.id ? { ...loan, name: loanName.trim(), amount: parseFloat(loanAmount) } : loan));
-        } else {
-            setLoans([...loans, { id: Date.now(), name: loanName.trim(), amount: parseFloat(loanAmount) }]);
+        
+        const loanData = { name: loanName.trim(), amount: parseFloat(loanAmount) };
+        
+        try {
+            if (isEditMode && editingLoan) {
+                const res = await fetch(`/api/loans?id=${editingLoan._id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loanData)
+                });
+                const json = await res.json();
+                if (json.success) {
+                    setLoans(loans.map(loan => loan._id === editingLoan._id ? json.data : loan));
+                }
+            } else {
+                const res = await fetch('/api/loans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loanData)
+                });
+                const json = await res.json();
+                if (json.success) {
+                    setLoans([...loans, json.data]);
+                }
+            }
+            closeModal();
+        } catch (err) {
+            console.error('Error saving loan:', err);
+            alert('Failed to save loan');
         }
-        closeModal();
     };
 
-    const deleteLoan = (loanId) => {
-        setLoans(loans.filter(loan => loan.id !== loanId));
-        setShowDeleteConfirm(false);
-        setDeletingLoan(null);
+    const deleteLoan = async (loanId) => {
+        try {
+            const res = await fetch(`/api/loans?id=${loanId}`, {
+                method: 'DELETE'
+            });
+            const json = await res.json();
+            if (json.success) {
+                setLoans(loans.filter(loan => loan._id !== loanId));
+                setShowDeleteConfirm(false);
+                setDeletingLoan(null);
+            }
+        } catch (err) {
+            console.error('Error deleting loan:', err);
+            alert('Failed to delete loan');
+        }
     };
 
     const closeModal = () => { setLoanName(''); setLoanAmount(''); setIsModalOpen(false); setIsEditMode(false); setEditingLoan(null); };
@@ -126,9 +175,9 @@ const LoanDashboard = () => {
                         rotationAccumulator += segment.percent;
                         return (
                             <circle
-                                key={segment.id} cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke={segment.color} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} strokeDashoffset={0} className="chart-segment chart-animate"
+                                key={segment._id} cx={size / 2} cy={size / 2} r={radius} fill="transparent" stroke={segment.color} strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} strokeDashoffset={0} className="chart-segment chart-animate"
                                 style={{ transformOrigin: 'center', transform: `rotate(${rotation}deg)` }}
-                                onClick={(e) => { e.stopPropagation(); setSelectedSegment(selectedSegment?.id === segment.id ? null : segment); }}
+                                onClick={(e) => { e.stopPropagation(); setSelectedSegment(selectedSegment?._id === segment._id ? null : segment); }}
                             />
                         );
                     })}
@@ -254,7 +303,7 @@ const LoanDashboard = () => {
                         {/* 3 Columns on ALL screens (grid-cols-3) to force single row on mobile */}
                         <div className="grid grid-cols-3 gap-2 sm:gap-8 justify-items-center">
                             {priorityLoans.map((loan, idx) => (
-                                <LoanCircle key={loan.id} loan={loan} index={idx} isFirst={idx === 0} />
+                                <LoanCircle key={loan._id} loan={loan} index={idx} isFirst={idx === 0} />
                             ))}
                         </div>
                     </section>
@@ -273,9 +322,9 @@ const LoanDashboard = () => {
                     <div className="flex flex-col gap-4">
                         {sortedLoans.map((loan) => {
                             const style = getCategoryStyle(loan.name);
-                            const segment = chartSegments.find(s => s.id === loan.id);
+                            const segment = chartSegments.find(s => s._id === loan.id || s._id === loan._id);
                             return (
-                                <div key={loan.id} onClick={(e) => { e.stopPropagation(); setIsEditMode(true); setEditingLoan(loan); setLoanName(loan.name); setLoanAmount(loan.amount); setIsModalOpen(true); }}
+                                <div key={loan._id} onClick={(e) => { e.stopPropagation(); setIsEditMode(true); setEditingLoan(loan); setLoanName(loan.name); setLoanAmount(loan.amount); setIsModalOpen(true); }}
                                     className="bg-white p-5 rounded-2xl border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
                                 >
                                     <div className="flex items-center gap-4">
@@ -334,7 +383,7 @@ const LoanDashboard = () => {
                         <p className="text-slate-500 mb-6">This action cannot be undone.</p>
                         <div className="flex gap-3">
                             <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancel</button>
-                            <button onClick={() => deleteLoan(deletingLoan?.id)} className="flex-1 py-2 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-200">Delete</button>
+                            <button onClick={() => deleteLoan(deletingLoan?._id)} className="flex-1 py-2 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-200">Delete</button>
                         </div>
                     </div>
                 </div>
