@@ -2,56 +2,51 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 
 const BottomNav = () => {
-  const navItems = [
-    {
-      path: '/',
-      label: 'Money Flow',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m.599-1H11" />
-        </svg>
-      ),
-    },
-    {
-      path: '/loans',
-      label: 'Loans',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-        </svg>
-      ),
-    },
-    {
-      path: '/vision',
-      label: 'Vision',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-      ),
-    },
-  ];
+    const items = [
+        {
+            to: '/',
+            label: 'Home',
+            icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            )
+        },
+        {
+            to: '/loans',
+            label: 'Debt',
+            icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            )
+        },
+        {
+            to: '/vision',
+            label: 'Vision',
+            icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+            )
+        }
+    ];
 
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-3 flex items-center justify-around z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          className={({ isActive }) =>
-            `flex flex-col items-center gap-1 transition-all duration-300 ${
-              isActive ? 'text-blue-600 scale-110' : 'text-slate-400 hover:text-slate-600'
-            }`
-          }
-        >
-          <div className="relative">
-            {item.icon}
-          </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider">{item.label}</span>
-        </NavLink>
-      ))}
-    </nav>
-  );
+    return (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+            <nav className="flex items-center gap-1 bg-white/80 backdrop-blur-xl px-2 py-1.5 rounded-[2rem] shadow-2xl border border-white/50">
+                {items.map((item) => (
+                    <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={({ isActive }) => `
+                            flex flex-col items-center justify-center p-3 sm:px-6 rounded-[1.5rem] transition-all duration-300
+                            ${isActive ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}
+                        `}
+                    >
+                        <div className="relative">
+                            {item.icon}
+                        </div>
+                        <span className="text-[9px] font-semibold uppercase tracking-wider mt-1 sm:block hidden">{item.label}</span>
+                    </NavLink>
+                ))}
+            </nav>
+        </div>
+    );
 };
 
 export default BottomNav;

@@ -47,10 +47,10 @@ export default async function handler(req, res) {
 
     case 'DELETE':
       try {
-        if (!id) return res.status(400).json({ success: false, error: 'ID is required to delete a loan' });
-        const deletedLoan = await Loan.deleteOne({ _id: id });
-        if (!deletedLoan) return res.status(404).json({ success: false, error: 'Loan not found' });
-        res.status(200).json({ success: true, data: {} });
+        if (!id) return res.status(400).json({ success: false, error: 'ID is required to close a loan' });
+        const loan = await Loan.findByIdAndUpdate(id, { status: 'closed' }, { new: true });
+        if (!loan) return res.status(404).json({ success: false, error: 'Loan not found' });
+        res.status(200).json({ success: true, data: loan });
       } catch (error) {
         res.status(400).json({ success: false, error: error.message });
       }

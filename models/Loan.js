@@ -14,6 +14,11 @@ const LoanSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  status: {
+    type: String,
+    enum: ['active', 'closed'],
+    default: 'active',
+  },
 });
 
 export default mongoose.models.Loan || mongoose.model('Loan', LoanSchema);

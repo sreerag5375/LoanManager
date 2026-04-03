@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { PieChart, BarChart } from '../components/Charts';
+import Keypad from '../components/Keypad';
 
 const MoneyFlow = () => {
     // --- STATE ---
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    
+
     // Transaction Form State
-    const [amount, setAmount] = useState('');
+    const [amount, setAmount] = useState('0');
     const [type, setType] = useState('expense');
     const [category, setCategory] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -32,10 +34,6 @@ const MoneyFlow = () => {
         }
     };
 
-    useEffect(() => {
-        fetchTransactions();
-    }, []);
-
     const fetchTransactions = async () => {
         try {
             setLoading(true);
@@ -50,7 +48,7 @@ const MoneyFlow = () => {
     };
 
     const handleSave = async (e) => {
-        e.preventDefault();
+        e?.preventDefault();
         let finalCategory = category;
 
         if (isAddingCategory && newCategoryName.trim()) {
@@ -74,7 +72,10 @@ const MoneyFlow = () => {
             }
         }
 
-        if (!finalCategory) return;
+        if (!finalCategory || parseFloat(amount) <= 0) {
+            alert('Please select a category and enter an amount');
+            return;
+        }
 
         const data = {
             amount: parseFloat(amount),
@@ -102,7 +103,7 @@ const MoneyFlow = () => {
     };
 
     const resetForm = () => {
-        setAmount('');
+        setAmount('0');
         setType('expense');
         setCategory('');
         setNewCategoryName('');
@@ -111,8 +112,69 @@ const MoneyFlow = () => {
         setNotes('');
     };
 
+    // --- KEYPAD LOGIC ---
+    const handleNumber = (n) => {
+        setAmount(prev => {
+            if (prev === '0' && n !== '.') return n;
+            if (n === '.' && prev.includes('.')) return prev;
+            return prev + n;
+        });
+    };
+    const handleDelete = () => {
+        setAmount(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
+    };
+
+    // --- DATE FILTERING ---
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+
+    useEffect(() => {
+        setCurrentPage(1); // Reset page when month changes
+    }, [selectedDate]);
+
+    const availableMonths = useMemo(() => {
+        const months = [];
+        const startYear = 2026;
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+
+        // If we are in 2026 or later, start from Jan 2026
+        if (currentYear >= startYear) {
+            const endMonth = currentYear > startYear ? 11 : currentMonth;
+            for (let m = 0; m <= endMonth; m++) {
+                months.push(new Date(startYear, m, 1));
+            }
+        }
+        return months;
+    }, []);
+
     // --- CALCULATIONS ---
-    const totals = useMemo(() => {
+    const filteredTransactions = useMemo(() => {
+        return transactions.filter(t => {
+            const d = new Date(t.date);
+            return d.getMonth() === selectedDate.getMonth() &&
+                d.getFullYear() === selectedDate.getFullYear();
+        });
+    }, [transactions, selectedDate]);
+
+    const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
+
+    const paginatedTransactions = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredTransactions.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredTransactions, currentPage]);
+
+    const monthTotals = useMemo(() => {
+        return filteredTransactions.reduce((acc, t) => {
+            if (t.type === 'income') acc.income += t.amount;
+            else acc.expense += t.amount;
+            return acc;
+        }, { income: 0, expense: 0 });
+    }, [filteredTransactions]);
+
+    const overallTotals = useMemo(() => {
         return transactions.reduce((acc, t) => {
             if (t.type === 'income') acc.income += t.amount;
             else acc.expense += t.amount;
@@ -120,217 +182,322 @@ const MoneyFlow = () => {
         }, { income: 0, expense: 0 });
     }, [transactions]);
 
-    const balance = totals.income - totals.expense;
+    const overallBalance = overallTotals.income - overallTotals.expense;
 
-    const categoryData = useMemo(() => {
-        const expenses = transactions.filter(t => t.type === 'expense');
-        const counts = expenses.reduce((acc, t) => {
-            acc[t.category] = (acc[t.category] || 0) + t.amount;
-            return acc;
-        }, {});
-        return Object.entries(counts).map(([name, value]) => ({ name, value }));
-    }, [transactions]);
+    // --- VIEW MODE & CHART DATA ---
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'chart'
+    const [isGraphLoading, setIsGraphLoading] = useState(false);
 
-    // --- CHART COMPONENTS ---
-    const PieChart = ({ data }) => {
-        if (data.length === 0) return <div className="text-slate-300 text-sm italic py-10 text-center">No data yet</div>;
-        
-        const total = data.reduce((sum, d) => sum + d.value, 0);
-        const size = 160;
-        const radius = 60;
-        const strokeWidth = 24;
-        const center = size / 2;
-        const circumference = 2 * Math.PI * radius;
-        
-        let accumulatedPercent = 0;
-        const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    useEffect(() => {
+        if (viewMode === 'chart') {
+            setIsGraphLoading(true);
+            const timer = setTimeout(() => setIsGraphLoading(false), 400);
+            return () => clearTimeout(timer);
+        }
+    }, [selectedDate, viewMode]);
 
-        return (
-            <div className="flex flex-col items-center">
-                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
-                    {data.map((d, i) => {
-                        const percent = d.value / total;
-                        const strokeDasharray = `${percent * circumference} ${circumference}`;
-                        const rotation = accumulatedPercent * 360;
-                        accumulatedPercent += percent;
-                        return (
-                            <circle
-                                key={i} cx={center} cy={center} r={radius} fill="none" stroke={colors[i % colors.length]}
-                                strokeWidth={strokeWidth} strokeDasharray={strokeDasharray} style={{ transformOrigin: 'center', transform: `rotate(${rotation}deg)` }}
-                                className="transition-all duration-500 hover:stroke-[28]"
-                            />
-                        );
-                    })}
-                </svg>
-                <div className="mt-6 flex flex-wrap justify-center gap-3">
-                    {data.map((d, i) => (
-                        <div key={i} className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i % colors.length] }}></div>
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase">{d.name}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
+    const chartData = useMemo(() => {
+        const expenseMap = {};
+        const incomeMap = {};
+        let totalExpense = 0;
+        let totalIncome = 0;
+
+        filteredTransactions.forEach(t => {
+            if (t.type === 'expense') {
+                expenseMap[t.category] = (expenseMap[t.category] || 0) + t.amount;
+                totalExpense += t.amount;
+            } else {
+                incomeMap[t.category] = (incomeMap[t.category] || 0) + t.amount;
+                totalIncome += t.amount;
+            }
+        });
+
+        const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#64748b'];
+        const expenseData = Object.entries(expenseMap).map(([label, value], i) => ({
+            label, value, color: colors[i % colors.length]
+        })).sort((a, b) => b.value - a.value);
+
+        const incomeData = Object.entries(incomeMap).map(([label, value], i) => ({
+            label, value, color: colors[i % colors.length]
+        })).sort((a, b) => b.value - a.value);
+
+        return { expenseData, incomeData, totalExpense, totalIncome };
+    }, [filteredTransactions]);
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-10">
-            {/* Header / Summary */}
-            <div className="bg-white px-6 pt-10 pb-20 rounded-b-[3rem] shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-60 -translate-y-1/2 translate-x-1/2"></div>
-                
-                <div className="relative z-10 max-w-lg mx-auto">
-                    <p className="text-slate-400 font-semibold uppercase tracking-widest text-[10px] mb-2">Current Balance</p>
-                    <h1 className={`text-5xl font-semibold tracking-tight ${balance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
-                        ₹{balance.toLocaleString('en-IN')}
-                    </h1>
-                    
-                    <div className="grid grid-cols-2 gap-4 mt-8">
-                        <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100/50">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[10px]">↓</div>
-                                <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Income</span>
+        <div className="min-h-screen pb-32 pt-12 px-6 max-w-md mx-auto overflow-x-hidden">
+            {/* 1. Centered Balance Section */}
+            <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
+                <p className="text-slate-400 font-semibold uppercase tracking-[0.2em] text-[10px] mb-3">Total Balance</p>
+                <h1 className={`text-4xl font-semibold tracking-tight tabular-nums mb-8 ${overallBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
+                    ₹{overallBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </h1>
+
+                {/* Month Summary Boxes */}
+                <div className="grid grid-cols-2 gap-4 px-2">
+                    <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-[2rem] p-5 text-left">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
                             </div>
-                            <p className="text-xl font-semibold text-slate-900">₹{totals.income.toLocaleString()}</p>
+                            <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-[0.1em]">Income</span>
                         </div>
-                        <div className="bg-rose-50 p-4 rounded-3xl border border-rose-100/50">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-6 h-6 bg-rose-500 rounded-full flex items-center justify-center text-white text-[10px]">↑</div>
-                                <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider">Expense</span>
+                        <p className="text-xl font-semibold text-emerald-900 tabular-nums tracking-tight">₹{monthTotals.income.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-red-50/50 border border-red-100/50 rounded-[2rem] p-5 text-left">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-100">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
                             </div>
-                            <p className="text-xl font-semibold text-slate-900">₹{totals.expense.toLocaleString()}</p>
+                            <span className="text-[10px] font-semibold text-red-600 uppercase tracking-[0.1em]">Expense</span>
                         </div>
+                        <p className="text-xl font-semibold text-red-900 tabular-nums tracking-tight">₹{monthTotals.expense.toLocaleString()}</p>
                     </div>
                 </div>
             </div>
 
-            {/* Dashboard Content */}
-            <div className="max-w-lg mx-auto px-6 -mt-12 relative z-20 space-y-8">
-                {/* Chart Card */}
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50">
-                    <h3 className="font-semibold text-slate-900 mb-6 flex items-center gap-2">
-                        <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
-                        Spending Analysis
-                    </h3>
-                    <PieChart data={categoryData} />
-                </div>
-
-                {/* Transactions List */}
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between px-2">
-                        <h3 className="font-semibold text-slate-900 text-lg uppercase tracking-tight">Recent Activity</h3>
-                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase italic">Timeline</span>
+            {/* 2. Action Bar */}
+            <div className="flex justify-between items-center mb-10 px-2">
+                <button onClick={() => { setType('income'); setIsModalOpen(true); }} className="btn-action-round group">
+                    <div className="w-14 h-14 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white transition-all group-active:scale-90 group-active:bg-blue-700">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                     </div>
-
-                    <div className="space-y-3">
-                        {transactions.map((t) => (
-                            <div key={t._id} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between hover:shadow-md transition-all group">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                        {t.type === 'income' ? '💰' : '💸'}
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-slate-800 leading-tight">{t.category}</h4>
-                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{new Date(t.date).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className={`font-semibold text-lg ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                        {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
-                                    </p>
-                                    {t.notes && <p className="text-[9px] text-slate-400 truncate max-w-[80px] italic">{t.notes}</p>}
-                                </div>
-                            </div>
-                        ))}
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Income</span>
+                </button>
+                <button onClick={() => { setType('expense'); setIsModalOpen(true); }} className="btn-action-round group">
+                    <div className="w-14 h-14 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white transition-all group-active:scale-90 group-active:bg-blue-700">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
                     </div>
-                </div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Expense</span>
+                </button>
+                <button onClick={() => setViewMode(viewMode === 'list' ? 'chart' : 'list')} className="btn-action-round group">
+                    <div className={`w-14 h-14 rounded-2xl shadow-lg border flex items-center justify-center transition-all duration-300 group-active:scale-90 ${viewMode === 'chart' ? 'bg-slate-900 text-white border-slate-900 shadow-slate-200' : 'bg-blue-600 text-white border-transparent shadow-blue-200'}`}>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                    </div>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider transition-colors ${viewMode === 'chart' ? 'text-slate-900' : 'text-slate-500'}`}>Dashboard</span>
+                </button>
+                <button className="btn-action-round group opacity-50 cursor-not-allowed">
+                    <div className="w-14 h-14 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Invest</span>
+                </button>
             </div>
 
-            {/* Floating Add Button */}
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 group"
-            >
-                <div className="absolute inset-0 bg-blue-600 rounded-full animate-ping opacity-20 group-hover:block hidden"></div>
-                <svg className="w-8 h-8 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                </svg>
-            </button>
-
-            {/* Transaction Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-end sm:items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-2xl font-semibold text-slate-900 mb-8 uppercase tracking-tighter">Add Money Flow</h3>
-                        
-                        <form onSubmit={handleSave} className="space-y-6">
-                            <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
-                                <button type="button" onClick={() => setType('income')} className={`flex-1 py-3 rounded-xl font-semibold transition-all ${type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Income</button>
-                                <button type="button" onClick={() => setType('expense')} className={`flex-1 py-3 rounded-xl font-semibold transition-all ${type === 'expense' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'}`}>Expense</button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <input autoFocus type="number" placeholder="₹ Amount" value={amount} onChange={e => setAmount(e.target.value)} 
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-2xl font-semibold placeholder-slate-300 focus:ring-2 focus:ring-blue-600" />
-                                
-                                <div className="space-y-3">
-                                    {!isAddingCategory ? (
-                                        <div className="relative">
-                                            <select 
-                                                value={category} 
-                                                onChange={e => {
-                                                    if (e.target.value === 'ADD_NEW') {
-                                                        setIsAddingCategory(true);
-                                                        setCategory('');
-                                                    } else {
-                                                        setCategory(e.target.value);
-                                                    }
-                                                }}
-                                                className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-semibold text-slate-700 focus:ring-2 focus:ring-blue-600 appearance-none"
-                                            >
-                                                <option value="">{dynamicCategories.filter(c => c.type === type).length === 0 ? 'No categories added yet' : 'Select Category'}</option>
-                                                {dynamicCategories.filter(c => c.type === type).map(c => (
-                                                    <option key={c._id} value={c.name}>{c.name}</option>
-                                                ))}
-                                                <option value="ADD_NEW" className="text-blue-600 font-semibold">+ Add New Category</option>
-                                            </select>
-                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="relative animate-in zoom-in-95 duration-200">
-                                            <input 
-                                                autoFocus
-                                                type="text" 
-                                                placeholder="Enter Category Name" 
-                                                value={newCategoryName} 
-                                                onChange={e => setNewCategoryName(e.target.value)}
-                                                className="w-full bg-blue-50 border-none rounded-2xl px-6 py-4 font-semibold text-blue-700 placeholder-blue-300 focus:ring-2 focus:ring-blue-600" 
-                                            />
-                                            <button 
-                                                type="button"
-                                                onClick={() => { setIsAddingCategory(false); setNewCategoryName(''); }}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 p-2"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-semibold text-slate-700 focus:ring-2 focus:ring-blue-600" />
-                                
-                                <input type="text" placeholder="Notes (Optional)" value={notes} onChange={e => setNotes(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-semibold text-slate-700 focus:ring-2 focus:ring-blue-600" />
-                            </div>
-
-                            <button type="submit" className="w-full bg-blue-600 text-white rounded-2xl py-4 font-semibold text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all">
-                                Save Transaction
+            {/* 3. Month Selector (Replaces Quick Categories) */}
+            <div className="mb-10">
+                <div className="flex items-center justify-between mb-4 px-2">
+                    <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">History</h3>
+                    <div className="w-6 h-px bg-slate-100"></div>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
+                    {availableMonths.map((m, i) => {
+                        const isActive = m.getMonth() === selectedDate.getMonth() && m.getFullYear() === selectedDate.getFullYear();
+                        return (
+                            <button
+                                key={i}
+                                onClick={() => setSelectedDate(m)}
+                                className={`
+                                    flex-shrink-0 px-6 py-3 rounded-2xl text-xs font-semibold transition-all duration-300
+                                    ${isActive ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-300'}
+                                `}
+                            >
+                                {m.toLocaleDateString(undefined, { month: 'short' })}
                             </button>
-                        </form>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* 4. Filtered Transactions (With Pagination) */}
+            <div className="animate-in fade-in duration-500">
+                <div className="flex items-center justify-between mb-4 px-2">
+                    <h3 className="text-sm font-semibold text-slate-900">
+                        {selectedDate.toLocaleDateString(undefined, { month: 'long' })} Activities
+                    </h3>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Page {currentPage} of {totalPages || 1}</span>
+                    </div>
+                </div>
+                <div className="space-y-1 mb-8">
+                    {paginatedTransactions.map((t) => (
+                        <div key={t._id} className="list-item-clean">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    {t.type === 'income' ? '💰' : '💸'}
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-slate-800 text-sm leading-tight">{t.category}</h4>
+                                    <p className="text-[10px] text-slate-400 font-medium">{new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+                                </div>
+                            </div>
+                            <p className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                {t.type === 'income' ? '+' : ''}₹{t.amount.toLocaleString()}
+                            </p>
+                        </div>
+                    ))}
+                    {paginatedTransactions.length === 0 && (
+                        <div className="py-12 text-center">
+                            <p className="text-slate-300 text-sm italic">No records for this month</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-4 pb-8">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => prev - 1)}
+                            className="w-12 h-12 bg-white rounded-2xl border border-slate-100 flex items-center justify-center text-slate-400 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <div className="flex gap-1.5">
+                            {[...Array(totalPages)].map((_, i) => (
+                                <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${currentPage === i + 1 ? 'bg-blue-600 w-4' : 'bg-slate-200'}`}></div>
+                            ))}
+                        </div>
+                        <button
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                            className="w-12 h-12 bg-white rounded-2xl border border-slate-100 flex items-center justify-center text-slate-400 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* 5. Graphical Dashboard (Full-Screen Overlay) */}
+            {viewMode === 'chart' && (
+                <div className="fixed inset-0 bg-white z-[120] animate-in slide-in-from-right duration-500 overflow-y-auto no-scrollbar">
+                    <div className="max-w-md mx-auto px-6 pt-12 pb-20">
+                        <header className="flex items-center justify-between mb-8">
+                            <button onClick={() => setViewMode('list')} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600 active:scale-90 transition-all">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">Graphical Insights</h3>
+                            <div className="w-10 h-10"></div>
+                        </header>
+
+                        {/* Dashboard Month Switcher (Choice Chips) */}
+                        <div className="mb-10 bg-slate-50/50 p-2 rounded-[2rem] border border-slate-100/50">
+                            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                                {availableMonths.map((m, i) => {
+                                    const isActive = m.getMonth() === selectedDate.getMonth() && m.getFullYear() === selectedDate.getFullYear();
+                                    return (
+                                        <button
+                                            key={i}
+                                            onClick={() => setSelectedDate(m)}
+                                            className={`
+                                                flex-shrink-0 px-6 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300
+                                                ${isActive ? 'bg-slate-900 text-white shadow-lg shadow-slate-200 scale-105' : 'bg-white text-slate-400 hover:text-slate-600'}
+                                            `}
+                                        >
+                                            {m.toLocaleDateString(undefined, { month: 'short' })}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <section className={`space-y-12 transition-all duration-300 ${isGraphLoading ? 'opacity-30 blur-[2px]' : 'opacity-100 blur-0'}`}>
+                            {/* Expense Pie */}
+                            <div>
+                                <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-6 px-2">Month Expense Breakdown</h3>
+                                <div className="card-clean py-10 shadow-xl shadow-slate-100">
+                                    <PieChart data={chartData.expenseData} total={chartData.totalExpense} />
+                                    <div className="grid grid-cols-2 gap-y-4 gap-x-6 mt-12 px-2">
+                                        {chartData.expenseData.slice(0, 4).map((item, i) => (
+                                            <div key={i} className="flex flex-col items-start text-left">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-20">{item.label}</span>
+                                                </div>
+                                                <p className="text-xs font-semibold text-slate-900 ml-4 tabular-nums">
+                                                    {((item.value / chartData.totalExpense) * 100).toFixed(0)}%
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Income Pie */}
+                            <div>
+                                <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-6 px-2">Month Income Sources</h3>
+                                <div className="card-clean py-10 shadow-xl shadow-emerald-50 !bg-emerald-50/20 border-emerald-100">
+                                    <PieChart data={chartData.incomeData} total={chartData.totalIncome} />
+                                    <div className="grid grid-cols-2 gap-y-4 gap-x-6 mt-12 px-2">
+                                        {chartData.incomeData.slice(0, 4).map((item, i) => (
+                                            <div key={i} className="flex flex-col items-start text-left">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-20">{item.label}</span>
+                                                </div>
+                                                <p className="text-xs font-semibold text-slate-900 ml-4 tabular-nums">
+                                                    {((item.value / chartData.totalIncome) * 100).toFixed(0)}%
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            )}
+
+            {/* 6. Keypad Modal (Add Transaction) */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-white z-[150] animate-in slide-in-from-bottom duration-500 overflow-y-auto no-scrollbar">
+                    <div className="max-w-md mx-auto px-6 pt-12 pb-8 h-full flex flex-col">
+                        <div className="flex items-center justify-between mb-12">
+                            <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">Enter amount</h3>
+                            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="text-center mb-12">
+                            <div className="inline-flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full mb-8">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-[12px]">{type === 'income' ? '💰' : '💸'}</div>
+                                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{type}</span>
+                            </div>
+                            <h2 className="text-6xl font-semibold text-slate-900 tracking-tight mb-2">₹{amount}</h2>
+                        </div>
+
+                        <div className="flex-1 space-y-6 mb-8">
+                            <div className="relative">
+                                <select
+                                    value={category}
+                                    onChange={e => e.target.value === 'ADD_NEW' ? setIsAddingCategory(true) : setCategory(e.target.value)}
+                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-semibold text-center text-slate-700 focus:ring-2 focus:ring-blue-600 appearance-none"
+                                >
+                                    <option value="">Select Category</option>
+                                    {dynamicCategories.filter(c => c.type === type).map(c => (
+                                        <option key={c._id} value={c.name}>{c.name}</option>
+                                    ))}
+                                    <option value="ADD_NEW" className="text-blue-600 font-semibold">+ Add New Category</option>
+                                </select>
+                            </div>
+                            {isAddingCategory && (
+                                <input autoFocus type="text" placeholder="Category Name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
+                                    className="w-full bg-blue-50 border-none rounded-2xl px-6 py-4 font-semibold text-center text-blue-700" />
+                            )}
+                        </div>
+
+                        <Keypad onNumber={handleNumber} onDelete={handleDelete} />
+
+                        <div className="mt-8">
+                            <button onClick={handleSave} className="w-full bg-blue-600 text-white rounded-3xl py-5 font-semibold text-lg shadow-xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95">
+                                Send money
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
