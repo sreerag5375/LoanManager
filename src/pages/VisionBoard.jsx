@@ -36,7 +36,7 @@ const VisionBoard = () => {
 
                     {/* Title Overlay */}
                     <div className="absolute bottom-6 right-8 pointer-events-none">
-                        <h1 className="text-4xl md:text-6xl font-black text-slate-900/10 tracking-tighter">2026 VISION</h1>
+                        <h1 className="text-4xl md:text-6xl font-semibold text-slate-900/10 tracking-tighter">2026 VISION</h1>
                     </div>
                 </div>
             </div>
