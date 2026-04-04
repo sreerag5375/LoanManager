@@ -54,7 +54,7 @@ export const PieChart = ({ data, total }) => {
  * Custom SVG Bar Chart
  * @param {Array} data - [{ label: string, value: number }]
  */
-export const BarChart = ({ data }) => {
+export const BarChart = ({ data, color }) => {
   const maxVal = Math.max(...data.map(d => d.value), 1);
   const chartHeight = 120;
   
@@ -70,8 +70,11 @@ export const BarChart = ({ data }) => {
                     ₹{item.value.toLocaleString()}
                 </div>
                 <div 
-                    className="w-full bg-blue-600 rounded-t-xl transition-all duration-500 group-hover:bg-blue-700" 
-                    style={{ height: `${Math.max(height, 8)}px` }}
+                    className={`w-full rounded-t-xl transition-all duration-500 ${color ? '' : 'bg-blue-600 hover:bg-blue-700'}`} 
+                    style={{ 
+                        height: `${Math.max(height, 8)}px`,
+                        backgroundColor: color || undefined
+                    }}
                 ></div>
             </div>
             <span className="text-[10px] font-semibold text-slate-400 mt-3 uppercase tracking-tighter truncate w-full text-center">

@@ -306,6 +306,9 @@ const MoneyFlow = () => {
     // --- VIEW MODE & CHART DATA ---
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'chart'
     const [isGraphLoading, setIsGraphLoading] = useState(false);
+    const [ccPeriod, setCcPeriod] = useState('month'); // 'day', 'week', 'month', '6month', 'year'
+    const [ccView, setCcView] = useState('chart'); // 'chart' or 'list'
+    const [isCcPeriodMenuOpen, setIsCcPeriodMenuOpen] = useState(false);
 
     useEffect(() => {
         if (viewMode === 'chart') {
@@ -342,6 +345,103 @@ const MoneyFlow = () => {
 
         return { expenseData, incomeData, totalExpense, totalIncome };
     }, [filteredTransactions]);
+
+    const ccChartData = useMemo(() => {
+        const ccTransactions = transactions.filter(t => t.paymentMethod === 'Credit Card' && t.type === 'expense');
+        const now = new Date();
+        const data = [];
+
+        if (ccPeriod === 'day') {
+            const dayLabels = ['12AM', '6AM', '12PM', '6PM'];
+            const dayValues = [0, 0, 0, 0];
+            ccTransactions.forEach(t => {
+                const d = new Date(t.date);
+                if (d.toDateString() === now.toDateString()) {
+                    const hour = d.getHours();
+                    if (hour < 6) dayValues[0] += t.amount;
+                    else if (hour < 12) dayValues[1] += t.amount;
+                    else if (hour < 18) dayValues[2] += t.amount;
+                    else dayValues[3] += t.amount;
+                }
+            });
+            dayLabels.forEach((label, i) => data.push({ label, value: dayValues[i] }));
+        } else if (ccPeriod === 'week') {
+            const last7Days = [...Array(7)].map((_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - (6 - i));
+                return d;
+            });
+            last7Days.forEach(day => {
+                const total = ccTransactions.reduce((acc, t) => {
+                    const tDate = new Date(t.date);
+                    return tDate.toDateString() === day.toDateString() ? acc + t.amount : acc;
+                }, 0);
+                data.push({ label: day.toLocaleDateString(undefined, { weekday: 'short' }), value: total });
+            });
+        } else if (ccPeriod === 'month') {
+            const weeks = ['W1', 'W2', 'W3', 'W4'];
+            const weekValues = [0, 0, 0, 0];
+            ccTransactions.forEach(t => {
+                const d = new Date(t.date);
+                if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                    const day = d.getDate();
+                    if (day <= 7) weekValues[0] += t.amount;
+                    else if (day <= 14) weekValues[1] += t.amount;
+                    else if (day <= 21) weekValues[2] += t.amount;
+                    else weekValues[3] += t.amount;
+                }
+            });
+            weeks.forEach((label, i) => data.push({ label, value: weekValues[i] }));
+        } else if (ccPeriod === '6month') {
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const total = ccTransactions.reduce((acc, t) => {
+                    const tDate = new Date(t.date);
+                    return (tDate.getMonth() === d.getMonth() && tDate.getFullYear() === d.getFullYear()) ? acc + t.amount : acc;
+                }, 0);
+                data.push({ label: d.toLocaleDateString(undefined, { month: 'short' }), value: total });
+            }
+        } else if (ccPeriod === 'year') {
+            for (let i = 11; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const total = ccTransactions.reduce((acc, t) => {
+                    const tDate = new Date(t.date);
+                    return (tDate.getMonth() === d.getMonth() && tDate.getFullYear() === d.getFullYear()) ? acc + t.amount : acc;
+                }, 0);
+                data.push({ label: d.toLocaleDateString(undefined, { month: 'short' }), value: total });
+            }
+        }
+
+        const totalCC = data.reduce((acc, d) => acc + d.value, 0);
+        return { data, totalCC };
+    }, [transactions, ccPeriod]);
+
+    const ccFilteredTransactions = useMemo(() => {
+        const ccTransactions = transactions.filter(t => t.paymentMethod === 'Credit Card' && t.type === 'expense');
+        const now = new Date();
+        
+        return ccTransactions.filter(t => {
+            const d = new Date(t.date);
+            if (ccPeriod === 'day') return d.toDateString() === now.toDateString();
+            if (ccPeriod === 'week') {
+                const weekAgo = new Date();
+                weekAgo.setDate(now.getDate() - 7);
+                return d >= weekAgo;
+            }
+            if (ccPeriod === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            if (ccPeriod === '6month') {
+                const sixMonthsAgo = new Date();
+                sixMonthsAgo.setMonth(now.getMonth() - 6);
+                return d >= sixMonthsAgo;
+            }
+            if (ccPeriod === 'year') {
+                const yearAgo = new Date();
+                yearAgo.setFullYear(now.getFullYear() - 1);
+                return d >= yearAgo;
+            }
+            return true;
+        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+    }, [transactions, ccPeriod]);
 
     return (
         <div className="min-h-screen pb-32 pt-12 px-6 max-w-md mx-auto overflow-x-hidden">
@@ -524,6 +624,79 @@ const MoneyFlow = () => {
                         </div>
 
                         <section className={`space-y-12 transition-all duration-300 ${isGraphLoading ? 'opacity-30 blur-[2px]' : 'opacity-100 blur-0'}`}>
+                            {/* Credit Card Bar Chart Section (Now at the Top) */}
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-6 px-2">
+                                    <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Credit Card Usage</h3>
+                                    <div className="flex items-center">
+                                        <button 
+                                            onClick={() => setIsCcPeriodMenuOpen(!isCcPeriodMenuOpen)}
+                                            className={`p-2 rounded-xl transition-all ${isCcPeriodMenuOpen ? 'bg-red-600 text-white shadow-lg shadow-red-100' : 'bg-slate-100/80 text-slate-600'}`}
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {isCcPeriodMenuOpen && (
+                                    <div className="absolute right-2 top-14 bg-white/90 backdrop-blur-xl border border-slate-100 shadow-2xl p-2 rounded-2xl z-50 animate-in fade-in zoom-in duration-200">
+                                        <div className="flex flex-col gap-1 min-w-[120px]">
+                                            <div className="px-3 py-1.5 border-b border-slate-50 mb-1">
+                                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Select Period</span>
+                                            </div>
+                                            {['day', 'week', 'month', '6month', 'year'].map(p => (
+                                                <button 
+                                                    key={p} 
+                                                    onClick={() => { setCcPeriod(p); setIsCcPeriodMenuOpen(false); }}
+                                                    className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase text-left transition-all ${ccPeriod === p ? 'bg-red-50 text-red-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                                                >
+                                                    {p === '6month' ? '6 Months' : p}
+                                                </button>
+                                            ))}
+                                            <div className="border-t border-slate-50 mt-1 pt-1">
+                                                <button 
+                                                    onClick={() => { setCcView(ccView === 'chart' ? 'list' : 'chart'); setIsCcPeriodMenuOpen(false); }}
+                                                    className="w-full px-3 py-2 rounded-xl text-[10px] font-bold uppercase text-left text-red-600 flex items-center justify-between hover:bg-red-50 transition-all"
+                                                >
+                                                    {ccView === 'chart' ? 'Show List' : 'Show Chart'}
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="card-clean pt-8 pb-10 shadow-xl shadow-red-50 !bg-red-50/20 border-red-100 flex flex-col items-center min-h-[280px]">
+                                    <div className="mb-6 text-center">
+                                        <p className="text-[10px] font-semibold text-red-400 uppercase tracking-widest mb-1">Total Credit Spend</p>
+                                        <p className="text-2xl font-bold text-red-900 tabular-nums">₹{ccChartData.totalCC.toLocaleString()}</p>
+                                        <p className="text-[8px] font-bold text-red-300 uppercase tracking-widest mt-1 opacity-70">{ccPeriod} VIEW</p>
+                                    </div>
+
+                                    {ccView === 'chart' ? (
+                                        <BarChart data={ccChartData.data} color="#ef4444" />
+                                    ) : (
+                                        <div className="w-full space-y-4 px-2 max-h-[160px] overflow-y-auto no-scrollbar">
+                                            {ccFilteredTransactions.length > 0 ? (
+                                                ccFilteredTransactions.map((t, i) => (
+                                                    <div key={i} className="flex justify-between items-center group">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-bold text-slate-900 uppercase">{t.category}</span>
+                                                            <span className="text-[8px] font-semibold text-slate-400">{new Date(t.date).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <span className="text-[11px] font-bold text-red-600 tabular-nums">₹{t.amount.toLocaleString()}</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="h-full flex items-center justify-center py-8">
+                                                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">No Transactions</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Expense Pie */}
                             <div>
                                 <h3 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-6 px-2">Month Expense Breakdown</h3>
