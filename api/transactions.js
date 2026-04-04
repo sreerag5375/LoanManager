@@ -5,7 +5,11 @@ export default async function handler(req, res) {
   const { method } = req;
   const { id } = req.query;
 
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Database connection failed: ' + error.message });
+  }
 
   switch (method) {
     case 'GET':

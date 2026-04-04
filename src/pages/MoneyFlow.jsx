@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PieChart, BarChart } from '../components/Charts';
 import Keypad from '../components/Keypad';
 
@@ -18,6 +19,20 @@ const MoneyFlow = () => {
     const [dynamicCategories, setDynamicCategories] = useState([]);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+    // --- DETAIL MODAL STATE ---
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    
+    // --- SETTINGS STATE ---
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [editingCatId, setEditingCatId] = useState(null);
+    const [editingCatName, setEditingCatName] = useState('');
+    const [isUpdatingCat, setIsUpdatingCat] = useState(false);
+    
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchTransactions();
@@ -47,33 +62,51 @@ const MoneyFlow = () => {
         }
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
     const handleSave = async (e) => {
         e?.preventDefault();
+        if (isSaving) return;
+
         let finalCategory = category;
 
         if (isAddingCategory && newCategoryName.trim()) {
-            try {
-                const catRes = await fetch('/api/categories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newCategoryName.trim(), type })
-                });
-                const catJson = await catRes.json();
-                if (catJson.success) {
-                    finalCategory = catJson.data.name;
-                    setDynamicCategories([...dynamicCategories, catJson.data]);
-                } else {
-                    alert('Failed to add category');
+            const trimmedName = newCategoryName.trim();
+            // Check if category already exists (case-insensitive)
+            const existingCat = dynamicCategories.find(
+                c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.type === type
+            );
+
+            if (existingCat) {
+                finalCategory = existingCat.name;
+            } else {
+                try {
+                    setIsSaving(true);
+                    const catRes = await fetch('/api/categories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmedName, type })
+                    });
+                    const catJson = await catRes.json();
+                    if (catJson.success) {
+                        finalCategory = catJson.data.name;
+                        setDynamicCategories([...dynamicCategories, catJson.data]);
+                    } else {
+                        alert('Failed to add category');
+                        setIsSaving(false);
+                        return;
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setIsSaving(false);
                     return;
                 }
-            } catch (err) {
-                console.error(err);
-                return;
             }
         }
 
         if (!finalCategory || parseFloat(amount) <= 0) {
             alert('Please select a category and enter an amount');
+            setIsSaving(false);
             return;
         }
 
@@ -86,19 +119,31 @@ const MoneyFlow = () => {
         };
 
         try {
-            const res = await fetch('/api/transactions', {
-                method: 'POST',
+            setIsSaving(true);
+            const url = isEditing ? `/api/transactions?id=${selectedTransaction._id}` : '/api/transactions';
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const json = await res.json();
             if (json.success) {
-                setTransactions([json.data, ...transactions]);
+                if (isEditing) {
+                    setTransactions(transactions.map(t => t._id === selectedTransaction._id ? json.data : t));
+                } else {
+                    setTransactions([json.data, ...transactions]);
+                }
                 setIsModalOpen(false);
+                setIsDetailModalOpen(false);
                 resetForm();
             }
         } catch (err) {
             console.error(err);
+            alert('Failed to save transaction');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -110,6 +155,71 @@ const MoneyFlow = () => {
         setIsAddingCategory(false);
         setDate(new Date().toISOString().split('T')[0]);
         setNotes('');
+        setIsEditing(false);
+    };
+
+    // --- HANDLERS ---
+    const openDetailModal = (t) => {
+        setSelectedTransaction(t);
+        setIsDetailModalOpen(true);
+    };
+
+    const handleEditTransaction = () => {
+        if (!selectedTransaction) return;
+        setIsEditing(true);
+        setAmount(selectedTransaction.amount.toString());
+        setType(selectedTransaction.type);
+        setCategory(selectedTransaction.category);
+        setDate(new Date(selectedTransaction.date).toISOString().split('T')[0]);
+        setNotes(selectedTransaction.notes || '');
+        setIsModalOpen(true);
+        setIsDetailModalOpen(false);
+    };
+
+    const handleDeleteTransaction = async () => {
+        if (!selectedTransaction || !window.confirm('Delete this transaction?')) return;
+        try {
+            setIsDeleting(true);
+            const res = await fetch(`/api/transactions?id=${selectedTransaction._id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (json.success) {
+                setTransactions(transactions.filter(t => t._id !== selectedTransaction._id));
+                setIsDetailModalOpen(false);
+                navigate('/'); // Redirect to home page
+            } else {
+                alert('Failed to delete: ' + (json.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('An error occurred during deletion');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleUpdateCategory = async (id) => {
+        if (!editingCatName.trim()) return;
+        try {
+            setIsUpdatingCat(true);
+            const res = await fetch(`/api/categories?id=${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: editingCatName.trim() })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setDynamicCategories(dynamicCategories.map(c => c._id === id ? json.data : c));
+                // If the updated category name was used in the current list/filter, refresh transactions
+                fetchTransactions();
+                setEditingCatId(null);
+            } else {
+                alert('Failed to update category');
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsUpdatingCat(false);
+        }
     };
 
     // --- KEYPAD LOGIC ---
@@ -276,11 +386,11 @@ const MoneyFlow = () => {
                     </div>
                     <span className={`text-[10px] font-semibold uppercase tracking-wider transition-colors ${viewMode === 'chart' ? 'text-slate-900' : 'text-slate-500'}`}>Dashboard</span>
                 </button>
-                <button className="btn-action-round group opacity-50 cursor-not-allowed">
-                    <div className="w-14 h-14 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                <button onClick={() => setIsSettingsModalOpen(true)} className="btn-action-round group">
+                    <div className="w-14 h-14 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center text-white transition-all group-active:scale-90 group-active:bg-blue-700">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </div>
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Invest</span>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Settings</span>
                 </button>
             </div>
 
@@ -321,18 +431,20 @@ const MoneyFlow = () => {
                 </div>
                 <div className="space-y-1 mb-8">
                     {paginatedTransactions.map((t) => (
-                        <div key={t._id} className="list-item-clean">
+                        <div key={t._id} className="list-item-clean cursor-pointer active:scale-95 transition-all" onClick={() => openDetailModal(t)}>
                             <div className="flex items-center gap-4">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
                                     {t.type === 'income' ? '💰' : '💸'}
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <h4 className="font-semibold text-slate-800 text-sm leading-tight">{t.category}</h4>
-                                    <p className="text-[10px] text-slate-400 font-medium">{new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </p>
                                 </div>
                             </div>
-                            <p className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                {t.type === 'income' ? '+' : ''}₹{t.amount.toLocaleString()}
+                            <p className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
                             </p>
                         </div>
                     ))}
@@ -454,10 +566,10 @@ const MoneyFlow = () => {
                 <div className="fixed inset-0 bg-white z-[150] animate-in slide-in-from-bottom duration-500 overflow-y-auto no-scrollbar">
                     <div className="max-w-md mx-auto px-6 pt-12 pb-8 h-full flex flex-col">
                         <div className="flex items-center justify-between mb-12">
-                            <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                            <button onClick={() => { setIsModalOpen(false); setIsEditing(false); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                             </button>
-                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">Enter amount</h3>
+                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">{isEditing ? 'Edit transaction' : 'Enter amount'}</h3>
                             <button className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </button>
@@ -494,10 +606,163 @@ const MoneyFlow = () => {
                         <Keypad onNumber={handleNumber} onDelete={handleDelete} />
 
                         <div className="mt-8">
-                            <button onClick={handleSave} className="w-full bg-blue-600 text-white rounded-3xl py-5 font-semibold text-lg shadow-xl shadow-blue-200 transition-all hover:bg-blue-700 active:scale-95">
-                                Send money
+                            <button 
+                                onClick={handleSave} 
+                                disabled={isSaving}
+                                className={`w-full text-white rounded-3xl py-5 font-semibold text-lg shadow-xl transition-all flex items-center justify-center gap-3 ${isSaving ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-blue-200'}`}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Saving...</span>
+                                    </>
+                                ) : isEditing ? (
+                                    'Update transaction'
+                                ) : (
+                                    'Send money'
+                                )}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 7. Transaction Detail Modal (Bottom Sheet) */}
+            {isDetailModalOpen && selectedTransaction && (
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[200] flex items-end justify-center animate-in fade-in duration-300" onClick={() => setIsDetailModalOpen(false)}>
+                    <div 
+                        className="bg-white w-full max-w-md rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Handle bar */}
+                        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-8"></div>
+
+                        <div className="flex flex-col items-center text-center mb-8">
+                            <div className={`w-20 h-20 rounded-3xl mb-6 flex items-center justify-center text-3xl ${selectedTransaction.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                {selectedTransaction.type === 'income' ? '💰' : '💸'}
+                            </div>
+                            <p className="text-slate-400 font-semibold uppercase tracking-widest text-[10px] mb-2">{selectedTransaction.category}</p>
+                            <h2 className={`text-4xl font-semibold tracking-tight ${selectedTransaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {selectedTransaction.type === 'income' ? '+' : '-'}₹{selectedTransaction.amount.toLocaleString()}
+                            </h2>
+                        </div>
+
+                        <div className="space-y-6 mb-10">
+                            <div className="flex items-center justify-between py-4 border-b border-slate-50">
+                                <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Date</span>
+                                <span className="text-slate-900 text-sm font-semibold">
+                                    {new Date(selectedTransaction.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between py-4 border-b border-slate-50">
+                                <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Type</span>
+                                <span className={`text-sm font-semibold capitalize ${selectedTransaction.type === 'income' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                                    {selectedTransaction.type}
+                                </span>
+                            </div>
+                            {selectedTransaction.notes && (
+                                <div className="py-4">
+                                    <span className="text-slate-400 text-xs font-medium uppercase tracking-wider block mb-2">Notes</span>
+                                    <p className="text-slate-600 text-sm leading-relaxed bg-slate-50 p-4 rounded-2xl">{selectedTransaction.notes}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <button 
+                                onClick={handleDeleteTransaction}
+                                disabled={isDeleting}
+                                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-50 text-red-600 font-semibold active:scale-95 transition-all border border-red-100 disabled:opacity-50"
+                            >
+                                {isDeleting ? (
+                                    <svg className="animate-spin h-5 w-5 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        <span>Delete</span>
+                                    </>
+                                )}
+                            </button>
+                            <button 
+                                onClick={handleEditTransaction}
+                                disabled={isDeleting}
+                                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-600 text-white font-semibold shadow-lg shadow-blue-100 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                <span>Edit</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 8. Settings Modal (Category Management) */}
+            {isSettingsModalOpen && (
+                <div className="fixed inset-0 bg-white z-[250] animate-in slide-in-from-right duration-500 overflow-y-auto no-scrollbar">
+                    <div className="max-w-md mx-auto px-6 pt-12 pb-20">
+                        <header className="flex items-center justify-between mb-10">
+                            <button onClick={() => setIsSettingsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600 active:scale-90 transition-all">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">Categories Settings</h3>
+                            <div className="w-10 h-10"></div>
+                        </header>
+
+                        {['income', 'expense'].map(tType => (
+                            <div key={tType} className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">
+                                    {tType} Categories
+                                </h4>
+                                <div className="space-y-2">
+                                    {dynamicCategories.filter(cat => cat.type === tType).map(cat => (
+                                        <div key={cat._id} className="bg-slate-50 rounded-2xl p-4 flex items-center justify-between transition-all">
+                                            {editingCatId === cat._id ? (
+                                                <div className="flex items-center gap-2 w-full">
+                                                    <input 
+                                                        autoFocus
+                                                        value={editingCatName}
+                                                        onChange={e => setEditingCatName(e.target.value)}
+                                                        className="flex-1 bg-white border border-blue-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button 
+                                                        onClick={() => handleUpdateCategory(cat._id)}
+                                                        disabled={isUpdatingCat}
+                                                        className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {isUpdatingCat ? '...' : 'Save'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setEditingCatId(null)}
+                                                        className="bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all active:scale-95"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <span className="text-sm font-semibold text-slate-800">{cat.name}</span>
+                                                    <button 
+                                                        onClick={() => { setEditingCatId(cat._id); setEditingCatName(cat.name); }}
+                                                        className="text-[10px] font-bold text-blue-600 uppercase tracking-wider hover:bg-white px-3 py-1.5 rounded-lg transition-all"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {dynamicCategories.filter(cat => cat.type === tType).length === 0 && (
+                                        <p className="text-xs text-slate-400 italic px-2">No categories found</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

@@ -5,7 +5,11 @@ export default async function handler(req, res) {
   const { method } = req;
   const { id } = req.query; // Used for PUT and DELETE (?id=...)
 
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Database connection failed: ' + error.message });
+  }
 
   switch (method) {
     case 'GET':
