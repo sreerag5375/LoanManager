@@ -23,6 +23,11 @@ const TransactionSchema = new mongoose.Schema({
     type: String,
     maxlength: [200, 'Notes cannot exceed 200 characters'],
   },
+  paymentMethod: {
+    type: String,
+    enum: ['Cash', 'Debit Card', 'Credit Card'],
+    default: 'Cash',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

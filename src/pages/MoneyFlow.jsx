@@ -15,6 +15,7 @@ const MoneyFlow = () => {
     const [category, setCategory] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('Cash');
 
     const [dynamicCategories, setDynamicCategories] = useState([]);
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -31,6 +32,9 @@ const MoneyFlow = () => {
     const [editingCatId, setEditingCatId] = useState(null);
     const [editingCatName, setEditingCatName] = useState('');
     const [isUpdatingCat, setIsUpdatingCat] = useState(false);
+    
+    // --- NOTES STATE ---
+    const [isNotesVisible, setIsNotesVisible] = useState(false);
     
     const navigate = useNavigate();
 
@@ -115,7 +119,8 @@ const MoneyFlow = () => {
             type,
             category: finalCategory,
             date,
-            notes
+            notes,
+            paymentMethod: type === 'expense' ? paymentMethod : undefined
         };
 
         try {
@@ -155,6 +160,8 @@ const MoneyFlow = () => {
         setIsAddingCategory(false);
         setDate(new Date().toISOString().split('T')[0]);
         setNotes('');
+        setPaymentMethod('Cash');
+        setIsNotesVisible(false);
         setIsEditing(false);
     };
 
@@ -172,6 +179,8 @@ const MoneyFlow = () => {
         setCategory(selectedTransaction.category);
         setDate(new Date(selectedTransaction.date).toISOString().split('T')[0]);
         setNotes(selectedTransaction.notes || '');
+        setPaymentMethod(selectedTransaction.paymentMethod || 'Cash');
+        setIsNotesVisible(!!selectedTransaction.notes);
         setIsModalOpen(true);
         setIsDetailModalOpen(false);
     };
@@ -566,40 +575,91 @@ const MoneyFlow = () => {
                 <div className="fixed inset-0 bg-white z-[150] animate-in slide-in-from-bottom duration-500 overflow-y-auto no-scrollbar">
                     <div className="max-w-md mx-auto px-6 pt-12 pb-8 h-full flex flex-col">
                         <div className="flex items-center justify-between mb-12">
-                            <button onClick={() => { setIsModalOpen(false); setIsEditing(false); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
+                            <button onClick={() => { setIsModalOpen(false); setIsEditing(false); resetForm(); }} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                             </button>
-                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-xs">{isEditing ? 'Edit transaction' : 'Enter amount'}</h3>
-                            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <h3 className="font-semibold text-slate-900 uppercase tracking-widest text-[10px]">
+                                {isEditing ? `Edit ${type}` : `Add ${type}`}
+                            </h3>
+                            <button 
+                                onClick={() => { 
+                                    setIsNotesVisible(!isNotesVisible);
+                                    if (!isNotesVisible) {
+                                        setTimeout(() => document.getElementById('transaction-notes')?.focus(), 100);
+                                    }
+                                }} 
+                                className={`w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-all ${isNotesVisible ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-slate-50 text-slate-600'}`}
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </button>
                         </div>
 
-                        <div className="text-center mb-12">
-                            <div className="inline-flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full mb-8">
-                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-[12px]">{type === 'income' ? '💰' : '💸'}</div>
-                                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{type}</span>
-                            </div>
-                            <h2 className="text-6xl font-semibold text-slate-900 tracking-tight mb-2">₹{amount}</h2>
+                        <div className="text-center mb-10 flex flex-col items-center">
+                            <h2 className="text-6xl font-semibold text-slate-900 tracking-tight mb-4">₹{amount}</h2>
+                            {isNotesVisible && (
+                                <div className="w-full max-w-[280px] animate-in fade-in zoom-in-95 duration-300">
+                                    <input 
+                                        id="transaction-notes"
+                                        type="text" 
+                                        placeholder="Add notes (optional)..." 
+                                        value={notes} 
+                                        onChange={e => setNotes(e.target.value)}
+                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 font-medium text-center text-slate-600 text-xs focus:ring-2 focus:ring-blue-100" 
+                                    />
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex-1 space-y-6 mb-8">
-                            <div className="relative">
-                                <select
-                                    value={category}
-                                    onChange={e => e.target.value === 'ADD_NEW' ? setIsAddingCategory(true) : setCategory(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-semibold text-center text-slate-700 focus:ring-2 focus:ring-blue-600 appearance-none"
-                                >
-                                    <option value="">Select Category</option>
-                                    {dynamicCategories.filter(c => c.type === type).map(c => (
-                                        <option key={c._id} value={c.name}>{c.name}</option>
-                                    ))}
-                                    <option value="ADD_NEW" className="text-blue-600 font-semibold">+ Add New Category</option>
-                                </select>
+                        <div className="flex-1 space-y-4 mb-8">
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Date Selector */}
+                                <div className="bg-slate-50 rounded-[1.5rem] p-4 flex flex-col items-center justify-center gap-1 border border-slate-100">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Date</span>
+                                    <input 
+                                        type="date" 
+                                        value={date} 
+                                        onChange={e => setDate(e.target.value)}
+                                        className="bg-transparent border-none p-0 text-xs font-bold text-slate-700 focus:ring-0 text-center w-full" 
+                                    />
+                                </div>
+                                {/* Category Selector */}
+                                <div className="bg-slate-50 rounded-[1.5rem] p-4 flex flex-col items-center justify-center gap-1 border border-slate-100">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Category</span>
+                                    <select
+                                        value={category}
+                                        onChange={e => e.target.value === 'ADD_NEW' ? setIsAddingCategory(true) : setCategory(e.target.value)}
+                                        className="bg-transparent border-none p-0 text-xs font-bold text-slate-700 focus:ring-0 text-center w-full appearance-none truncate"
+                                    >
+                                        <option value="">Select</option>
+                                        {dynamicCategories.filter(c => c.type === type).map(c => (
+                                            <option key={c._id} value={c.name}>{c.name}</option>
+                                        ))}
+                                        <option value="ADD_NEW" className="text-blue-600">+ Add New</option>
+                                    </select>
+                                </div>
                             </div>
+                            
+                            {/* Payment Method Selector (Only for Expenses) */}
+                            {type === 'expense' && (
+                                <div className="bg-slate-50 rounded-[1.5rem] p-4 border border-slate-100">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-3 block text-center">Payment Method</span>
+                                    <div className="flex gap-2">
+                                        {['Cash', 'Debit Card', 'Credit Card'].map(pm => (
+                                            <button
+                                                key={pm}
+                                                onClick={() => setPaymentMethod(pm)}
+                                                className={`flex-1 py-2.5 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all ${paymentMethod === pm ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}
+                                            >
+                                                {pm}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {isAddingCategory && (
-                                <input autoFocus type="text" placeholder="Category Name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
-                                    className="w-full bg-blue-50 border-none rounded-2xl px-6 py-4 font-semibold text-center text-blue-700" />
+                                <input autoFocus type="text" placeholder="New Category Name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
+                                    className="w-full bg-blue-50 border-none rounded-2xl px-6 py-4 font-semibold text-center text-blue-700 text-sm" />
                             )}
                         </div>
 
@@ -633,12 +693,18 @@ const MoneyFlow = () => {
             {/* 7. Transaction Detail Modal (Bottom Sheet) */}
             {isDetailModalOpen && selectedTransaction && (
                 <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[200] flex items-end justify-center animate-in fade-in duration-300" onClick={() => setIsDetailModalOpen(false)}>
-                    <div 
-                        className="bg-white w-full max-w-md rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden" 
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Handle bar */}
-                        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-8"></div>
+                        <div 
+                            className="bg-white w-full max-w-md rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden relative" 
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <button 
+                                onClick={() => setIsDetailModalOpen(false)}
+                                className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 active:scale-90 transition-all font-bold"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                            {/* Handle bar */}
+                            <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-8"></div>
 
                         <div className="flex flex-col items-center text-center mb-8">
                             <div className={`w-20 h-20 rounded-3xl mb-6 flex items-center justify-center text-3xl ${selectedTransaction.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -663,6 +729,12 @@ const MoneyFlow = () => {
                                     {selectedTransaction.type}
                                 </span>
                             </div>
+                            {selectedTransaction.paymentMethod && (
+                                <div className="flex items-center justify-between py-4 border-b border-slate-50">
+                                    <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Payment Method</span>
+                                    <span className="text-slate-900 text-sm font-semibold">{selectedTransaction.paymentMethod}</span>
+                                </div>
+                            )}
                             {selectedTransaction.notes && (
                                 <div className="py-4">
                                     <span className="text-slate-400 text-xs font-medium uppercase tracking-wider block mb-2">Notes</span>
@@ -675,7 +747,7 @@ const MoneyFlow = () => {
                             <button 
                                 onClick={handleDeleteTransaction}
                                 disabled={isDeleting}
-                                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-50 text-red-600 font-semibold active:scale-95 transition-all border border-red-100 disabled:opacity-50"
+                                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-50 text-red-600 font-semibold active:scale-95 transition-all border border-red-100 disabled:opacity-50"
                             >
                                 {isDeleting ? (
                                     <svg className="animate-spin h-5 w-5 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -685,17 +757,17 @@ const MoneyFlow = () => {
                                 ) : (
                                     <>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        <span>Delete</span>
+                                        <span className="text-sm">Delete</span>
                                     </>
                                 )}
                             </button>
                             <button 
                                 onClick={handleEditTransaction}
                                 disabled={isDeleting}
-                                className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-blue-600 text-white font-semibold shadow-lg shadow-blue-100 active:scale-95 transition-all disabled:opacity-50"
+                                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-600 text-white font-semibold shadow-lg shadow-blue-100 active:scale-95 transition-all disabled:opacity-50"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                <span>Edit</span>
+                                <span className="text-sm">Edit</span>
                             </button>
                         </div>
                     </div>
