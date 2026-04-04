@@ -161,46 +161,55 @@ const LoanDashboard = () => {
                 <h1 className={`text-5xl font-extrabold tracking-tight tabular-nums mb-8 ${view === 'active' ? 'text-red-500' : 'text-emerald-500'}`}>
                     ₹{(view === 'active' ? totalActiveAmount : totalClosedAmount).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
                 </h1>
-                <div className="flex justify-center">
-                    <div className={`w-16 h-16 rounded-[2rem] flex items-center justify-center text-white shadow-xl animate-float transition-all duration-500 ${view === 'active' ? 'bg-slate-900 shadow-slate-200' : 'bg-emerald-600 shadow-emerald-200'}`}>
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={view === 'active' ? "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} />
-                        </svg>
+                <div className="flex justify-between items-center mb-12 bg-white/60 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/50 shadow-sm">
+                    <div 
+                        onClick={() => setView('active')}
+                        className={`flex flex-col items-center gap-1 flex-1 cursor-pointer transition-all active:scale-95 hover:opacity-80 ${view === 'active' ? 'opacity-100' : 'opacity-60'}`}
+                    >
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-1">Active</span>
+                        <div className="text-2xl font-semibold text-red-500 tabular-nums leading-none">
+                            {activeLoans.length}
+                        </div>
+                    </div>
+                    
+                    <div 
+                        onClick={() => setView('closed')}
+                        className={`flex-1 flex flex-col items-center gap-1 border-x border-slate-100 cursor-pointer transition-all active:scale-95 hover:opacity-80 ${view === 'closed' ? 'opacity-100' : 'opacity-60'}`}
+                    >
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-1">Cleared</span>
+                        <div className="text-2xl font-semibold text-emerald-500 tabular-nums leading-none">
+                            {closedLoans.length}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-1 flex-1">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-1">Paid Off</span>
+                        <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">
+                            ₹{(totalClosedAmount / 1000).toFixed(0)}k
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* 2. Action Bar */}
-            <div className="flex justify-between items-center mb-12 bg-white/60 backdrop-blur-xl p-4 rounded-[2.5rem] border border-white/50 shadow-sm">
-                <button onClick={() => { setIsEditMode(false); setIsModalOpen(true); }} className="flex flex-col items-center gap-2 flex-1">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl shadow-lg shadow-blue-100 flex items-center justify-center text-white transition-all active:scale-90">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">New debt</span>
-                </button>
-                
-                <button onClick={() => setView(view === 'active' ? 'closed' : 'active')} className="flex flex-col items-center gap-2 flex-1 border-x border-slate-100">
-                    <div className={`w-12 h-12 rounded-2xl shadow-sm border flex items-center justify-center transition-all active:scale-90 ${view === 'closed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-slate-100 text-slate-400'}`}>
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${view === 'closed' ? 'text-emerald-600' : 'text-slate-400'}`}>Closed</span>
-                </button>
-
-                <button onClick={() => navigate('/')} className="flex flex-col items-center gap-2 flex-1">
-                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 transition-all active:scale-90">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Dashboard</span>
-                </button>
-            </div>
-
             {/* 3. Debt Breakdown List */}
             <div className="mb-12">
-                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-                        {view === 'active' ? 'Active Tracking' : 'Paid History'}
-                    </h3>
-                    <div className="flex-1 ml-4 h-px bg-slate-100"></div>
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4 flex-1">
+                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">
+                            {view === 'active' ? 'Loans' : 'Paid History'}
+                        </h3>
+                        <div className="flex-1 h-px bg-slate-100"></div>
+                    </div>
+                    
+                    {view === 'active' && (
+                        <button 
+                            onClick={() => { setIsEditMode(false); setIsModalOpen(true); }}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg shadow-blue-100 transition-all active:scale-95 ml-4"
+                        >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-white/90">Add loan</span>
+                        </button>
+                    )}
                 </div>
                 <div className="space-y-1.5">
                     {displayLoans.map((loan) => {
@@ -215,7 +224,13 @@ const LoanDashboard = () => {
                                     </div>
                                     <div>
                                         <h4 className={`font-bold text-sm tracking-tight leading-tight ${view === 'closed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{loan.name}</h4>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{view === 'active' ? 'Ongoing record' : 'Success cleared'}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                            {view === 'closed' 
+                                                ? (loan.closedAt 
+                                                    ? `Paid on ${new Date(loan.closedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} at ${new Date(loan.closedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+                                                    : 'CLOSED RECORD')
+                                                : 'Ongoing record'}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="text-right">
