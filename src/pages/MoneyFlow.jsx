@@ -348,7 +348,7 @@ const MoneyFlow = () => {
 
     const ccChartData = useMemo(() => {
         const ccTransactions = transactions.filter(t => t.paymentMethod === 'Credit Card' && t.type === 'expense');
-        const now = new Date();
+        const now = selectedDate;
         const data = [];
 
         if (ccPeriod === 'day') {
@@ -414,11 +414,11 @@ const MoneyFlow = () => {
 
         const totalCC = data.reduce((acc, d) => acc + d.value, 0);
         return { data, totalCC };
-    }, [transactions, ccPeriod]);
+    }, [transactions, ccPeriod, selectedDate]);
 
     const ccFilteredTransactions = useMemo(() => {
         const ccTransactions = transactions.filter(t => t.paymentMethod === 'Credit Card' && t.type === 'expense');
-        const now = new Date();
+        const now = selectedDate;
         
         return ccTransactions.filter(t => {
             const d = new Date(t.date);
@@ -441,7 +441,7 @@ const MoneyFlow = () => {
             }
             return true;
         }).sort((a, b) => new Date(b.date) - new Date(a.date));
-    }, [transactions, ccPeriod]);
+    }, [transactions, ccPeriod, selectedDate]);
 
     return (
         <div className="min-h-screen pb-32 pt-12 px-6 max-w-md mx-auto overflow-x-hidden">
@@ -703,14 +703,14 @@ const MoneyFlow = () => {
                                 <div className="card-clean py-10 shadow-xl shadow-slate-100">
                                     <PieChart data={chartData.expenseData} total={chartData.totalExpense} />
                                     <div className="grid grid-cols-2 gap-y-4 gap-x-6 mt-12 px-2">
-                                        {chartData.expenseData.slice(0, 4).map((item, i) => (
+                                        {chartData.expenseData.map((item, i) => (
                                             <div key={i} className="flex flex-col items-start text-left">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-20">{item.label}</span>
+                                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>
+                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-24">{item.label}</span>
                                                 </div>
                                                 <p className="text-xs font-semibold text-slate-900 ml-4 tabular-nums">
-                                                    {((item.value / chartData.totalExpense) * 100).toFixed(0)}%
+                                                    ₹{item.value.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">({((item.value / chartData.totalExpense) * 100).toFixed(0)}%)</span>
                                                 </p>
                                             </div>
                                         ))}
@@ -724,14 +724,14 @@ const MoneyFlow = () => {
                                 <div className="card-clean py-10 shadow-xl shadow-emerald-50 !bg-emerald-50/20 border-emerald-100">
                                     <PieChart data={chartData.incomeData} total={chartData.totalIncome} />
                                     <div className="grid grid-cols-2 gap-y-4 gap-x-6 mt-12 px-2">
-                                        {chartData.incomeData.slice(0, 4).map((item, i) => (
+                                        {chartData.incomeData.map((item, i) => (
                                             <div key={i} className="flex flex-col items-start text-left">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-20">{item.label}</span>
+                                                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>
+                                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate w-24">{item.label}</span>
                                                 </div>
                                                 <p className="text-xs font-semibold text-slate-900 ml-4 tabular-nums">
-                                                    {((item.value / chartData.totalIncome) * 100).toFixed(0)}%
+                                                    ₹{item.value.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">({((item.value / chartData.totalIncome) * 100).toFixed(0)}%)</span>
                                                 </p>
                                             </div>
                                         ))}
