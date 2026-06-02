@@ -37,18 +37,18 @@ export default async function handler(req, res) {
         const { id } = req.query;
         const { name } = req.body;
         if (!id || !name) return res.status(400).json({ success: false, error: 'ID and Name required' });
-        
+
         const oldCategory = await Category.findById(id);
         if (!oldCategory) return res.status(404).json({ success: false, error: 'Category not found' });
-        
+
         const oldName = oldCategory.name;
         const type = oldCategory.type;
-        
+
         const updatedCategory = await Category.findByIdAndUpdate(id, { name }, { new: true });
-        
+
         // Update all transactions that were using the old category name
         await Transaction.updateMany({ category: oldName, type: type }, { category: name });
-        
+
         res.status(200).json({ success: true, data: updatedCategory });
       } catch (error) {
         res.status(400).json({ success: false, error: error.message });

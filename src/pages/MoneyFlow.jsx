@@ -36,6 +36,9 @@ const MoneyFlow = () => {
     // --- NOTES STATE ---
     const [isNotesVisible, setIsNotesVisible] = useState(false);
     
+    // --- BREAKDOWN MODAL STATE ---
+    const [breakdownType, setBreakdownType] = useState(null);
+    
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -293,16 +296,6 @@ const MoneyFlow = () => {
         }, { income: 0, expense: 0 });
     }, [filteredTransactions]);
 
-    const overallTotals = useMemo(() => {
-        return transactions.reduce((acc, t) => {
-            if (t.type === 'income') acc.income += t.amount;
-            else acc.expense += t.amount;
-            return acc;
-        }, { income: 0, expense: 0 });
-    }, [transactions]);
-
-    const overallBalance = overallTotals.income - overallTotals.expense;
-
     // --- VIEW MODE & CHART DATA ---
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'chart'
     const [isGraphLoading, setIsGraphLoading] = useState(false);
@@ -445,32 +438,45 @@ const MoneyFlow = () => {
 
     return (
         <div className="min-h-screen pb-32 pt-12 px-6 max-w-md mx-auto overflow-x-hidden">
-            {/* 1. Centered Balance Section */}
+            {/* 1. Centered Month Summary Section */}
             <div className="text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
-                <p className="text-slate-400 font-semibold uppercase tracking-[0.2em] text-[10px] mb-3">Total Balance</p>
-                <h1 className={`text-4xl font-semibold tracking-tight tabular-nums mb-8 ${overallBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
-                    ₹{overallBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </h1>
+                <p className="text-slate-400 font-semibold uppercase tracking-[0.2em] text-[10px] mb-4">Month Summary</p>
 
-                {/* Month Summary Boxes */}
                 <div className="grid grid-cols-2 gap-4 px-2">
-                    <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-[2rem] p-5 text-left">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    <div 
+                        onClick={() => setBreakdownType('income')}
+                        className="bg-emerald-50/40 border border-emerald-100/40 rounded-[2rem] p-5 text-left transition-all duration-300 hover:bg-emerald-50/70 hover:shadow-lg hover:shadow-emerald-100/30 cursor-pointer active:scale-95 relative overflow-hidden group animate-in fade-in"
+                    >
+                        <div className="absolute right-0 bottom-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-6 -mb-6 group-hover:bg-emerald-500/10 transition-all duration-300"></div>
+                        <div className="flex items-center justify-between mb-3 relative z-10">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-[0.1em]">Income</span>
                             </div>
-                            <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-[0.1em]">Income</span>
+                            <svg className="w-3.5 h-3.5 text-emerald-400 group-hover:translate-x-0.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                         </div>
-                        <p className="text-xl font-semibold text-emerald-900 tabular-nums tracking-tight">₹{monthTotals.income.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-emerald-950 tabular-nums tracking-tight relative z-10">₹{monthTotals.income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[8px] font-semibold text-emerald-500/80 uppercase tracking-wider mt-1 relative z-10">Tap for streams</p>
                     </div>
-                    <div className="bg-red-50/50 border border-red-100/50 rounded-[2rem] p-5 text-left">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-100">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+
+                    <div 
+                        onClick={() => setBreakdownType('expense')}
+                        className="bg-red-50/40 border border-red-100/40 rounded-[2rem] p-5 text-left transition-all duration-300 hover:bg-red-50/70 hover:shadow-lg hover:shadow-red-100/30 cursor-pointer active:scale-95 relative overflow-hidden group animate-in fade-in"
+                    >
+                        <div className="absolute right-0 bottom-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl -mr-6 -mb-6 group-hover:bg-red-500/10 transition-all duration-300"></div>
+                        <div className="flex items-center justify-between mb-3 relative z-10">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-100">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                </div>
+                                <span className="text-[10px] font-semibold text-red-600 uppercase tracking-[0.1em]">Expense</span>
                             </div>
-                            <span className="text-[10px] font-semibold text-red-600 uppercase tracking-[0.1em]">Expense</span>
+                            <svg className="w-3.5 h-3.5 text-red-400 group-hover:translate-x-0.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                         </div>
-                        <p className="text-xl font-semibold text-red-900 tabular-nums tracking-tight">₹{monthTotals.expense.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-red-950 tabular-nums tracking-tight relative z-10">₹{monthTotals.expense.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[8px] font-semibold text-red-500/80 uppercase tracking-wider mt-1 relative z-10">Tap for breakdown</p>
                     </div>
                 </div>
             </div>
@@ -1008,6 +1014,93 @@ const MoneyFlow = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 7. Month Breakdown Bottom Sheet */}
+            {breakdownType && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-end justify-center animate-in fade-in duration-300" onClick={() => setBreakdownType(null)}>
+                    <div className="bg-white rounded-t-[3rem] w-full max-w-md p-8 animate-in slide-in-from-bottom duration-500 max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                        
+                        {/* Drag Handle or Header Indicator */}
+                        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-6"></div>
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <span className={`text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full ${breakdownType === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                    {breakdownType} Breakdown
+                                </span>
+                                <h3 className="font-bold text-slate-900 text-lg mt-2">
+                                    {selectedDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                                </h3>
+                            </div>
+                            <button onClick={() => setBreakdownType(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 transition-all">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        {/* Big Total */}
+                        <div className="text-center py-6 mb-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total {breakdownType}</span>
+                            <h2 className={`text-4xl font-extrabold tracking-tight tabular-nums mt-1 ${breakdownType === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                ₹{(breakdownType === 'income' ? monthTotals.income : monthTotals.expense).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </h2>
+                        </div>
+
+                        {/* Breakdown Streams List */}
+                        <div className="space-y-4 flex-1">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 px-1">Streams & Categories</h4>
+                            
+                            {(breakdownType === 'income' ? chartData.incomeData : chartData.expenseData).length > 0 ? (
+                                (breakdownType === 'income' ? chartData.incomeData : chartData.expenseData).map((stream, idx) => {
+                                    const percentage = (breakdownType === 'income' ? monthTotals.income : monthTotals.expense) > 0 
+                                        ? ((stream.value / (breakdownType === 'income' ? monthTotals.income : monthTotals.expense)) * 100).toFixed(0) 
+                                        : 0;
+
+                                    return (
+                                        <div key={idx} className="bg-slate-50/30 border border-slate-100/50 rounded-2xl p-4 flex flex-col gap-2 hover:bg-slate-50/80 transition-colors">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stream.color }}></span>
+                                                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{stream.label}</span>
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-900 tabular-nums">
+                                                    ₹{stream.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Progress bar */}
+                                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div 
+                                                    className="h-full rounded-full transition-all duration-500" 
+                                                    style={{ 
+                                                        backgroundColor: stream.color, 
+                                                        width: `${percentage}%` 
+                                                    }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex justify-between text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
+                                                <span>Weight</span>
+                                                <span>{percentage}%</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-12">
+                                    <p className="text-slate-300 text-xs italic">No {breakdownType} streams recorded this month</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Close button */}
+                        <div className="mt-8">
+                            <button onClick={() => setBreakdownType(null)} className="w-full bg-slate-900 text-white rounded-2xl py-4 font-bold text-xs uppercase tracking-widest active:scale-95 transition-all hover:bg-slate-850">
+                                Done
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
