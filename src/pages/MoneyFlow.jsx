@@ -250,9 +250,12 @@ const MoneyFlow = () => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
+    const [listStyle, setListStyle] = useState('grouped'); // 'grouped' or 'all'
+    const [expandedCategories, setExpandedCategories] = useState({});
 
     useEffect(() => {
         setCurrentPage(1); // Reset page when month changes
+        setExpandedCategories({}); // Reset expanded categories when month changes
     }, [selectedDate]);
 
     const availableMonths = useMemo(() => {
@@ -287,6 +290,30 @@ const MoneyFlow = () => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredTransactions.slice(start, start + ITEMS_PER_PAGE);
     }, [filteredTransactions, currentPage]);
+
+    const groupedCategories = useMemo(() => {
+        const groups = {};
+        filteredTransactions.forEach(t => {
+            if (!groups[t.category]) {
+                groups[t.category] = {
+                    category: t.category,
+                    type: t.type,
+                    transactions: [],
+                    totalAmount: 0
+                };
+            }
+            groups[t.category].transactions.push(t);
+            groups[t.category].totalAmount += t.amount;
+        });
+
+        // Sort nested transactions by date descending (latest first)
+        Object.values(groups).forEach(g => {
+            g.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        });
+
+        // Sort categories by totalAmount descending
+        return Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
+    }, [filteredTransactions]);
 
     const monthTotals = useMemo(() => {
         return filteredTransactions.reduce((acc, t) => {
@@ -534,44 +561,138 @@ const MoneyFlow = () => {
                 </div>
             </div>
 
-            {/* 4. Filtered Transactions (With Pagination) */}
+            {/* 4. Filtered Transactions (With Pagination/Grouping) */}
             <div className="animate-in fade-in duration-500">
                 <div className="flex items-center justify-between mb-4 px-2">
                     <h3 className="text-sm font-semibold text-slate-900">
                         {selectedDate.toLocaleDateString(undefined, { month: 'long' })} Activities
                     </h3>
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Page {currentPage} of {totalPages || 1}</span>
+                        <div className="bg-slate-100 p-0.5 rounded-full flex">
+                            <button
+                                onClick={() => setListStyle('grouped')}
+                                className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-full transition-all ${listStyle === 'grouped' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Grouped
+                            </button>
+                            <button
+                                onClick={() => setListStyle('all')}
+                                className={`text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-full transition-all ${listStyle === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                All
+                            </button>
+                        </div>
+                        {listStyle === 'all' && (
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pl-1">
+                                Page {currentPage} of {totalPages || 1}
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="space-y-1 mb-8">
-                    {paginatedTransactions.map((t) => (
-                        <div key={t._id} className="list-item-clean cursor-pointer active:scale-95 transition-all" onClick={() => openDetailModal(t)}>
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    {t.type === 'income' ? '💰' : '💸'}
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="font-semibold text-slate-800 text-sm leading-tight">{t.category}</h4>
-                                    <p className="text-[10px] text-slate-400 font-medium">
-                                        {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </p>
-                                </div>
-                            </div>
-                            <p className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                                {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
-                            </p>
-                        </div>
-                    ))}
-                    {paginatedTransactions.length === 0 && (
+                    {filteredTransactions.length === 0 ? (
                         <div className="py-12 text-center">
                             <p className="text-slate-300 text-sm italic">No records for this month</p>
                         </div>
+                    ) : listStyle === 'grouped' ? (
+                        groupedCategories.map((group) => {
+                            const isExpanded = !!expandedCategories[group.category];
+                            const count = group.transactions.length;
+                            const typeLabel = group.type === 'income' ? 'income' : 'expense';
+                            const itemLabel = `${count} ${typeLabel}${count !== 1 ? 's' : ''}`;
+                            return (
+                                <div key={group.category} className="bg-white border border-slate-100 rounded-3xl p-1 mb-2">
+                                    <div 
+                                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 rounded-2xl active:scale-99 transition-all"
+                                        onClick={() => {
+                                            setExpandedCategories(prev => ({
+                                                ...prev,
+                                                [group.category]: !prev[group.category]
+                                            }));
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${group.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                {group.type === 'income' ? '💰' : '💸'}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-slate-800 text-sm leading-tight">{group.category}</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                                                    {itemLabel}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <p className={`font-semibold text-sm ${group.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {group.type === 'income' ? '+' : '-'}₹{group.totalAmount.toLocaleString()}
+                                            </p>
+                                            <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-slate-100' : ''}`}>
+                                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {isExpanded && (
+                                        <div className="mt-1 pl-4 border-l-2 border-slate-100 space-y-1 bg-slate-50/30 rounded-r-2xl py-2 pr-2 animate-in slide-in-from-top-2 duration-200">
+                                            {group.transactions.map((t) => (
+                                                <div 
+                                                    key={t._id} 
+                                                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 cursor-pointer active:scale-98 transition-all"
+                                                    onClick={() => openDetailModal(t)}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="text-[10px] bg-white text-slate-500 font-bold uppercase tracking-wider px-2 py-1 rounded-md border border-slate-100">
+                                                            {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-semibold text-slate-700 leading-tight">
+                                                                {t.notes || 'Transaction'}
+                                                            </span>
+                                                            {t.paymentMethod && (
+                                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                    {t.paymentMethod}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className={`text-xs font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                            {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    ) : (
+                        paginatedTransactions.map((t) => (
+                            <div key={t._id} className="list-item-clean cursor-pointer active:scale-95 transition-all" onClick={() => openDetailModal(t)}>
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                        {t.type === 'income' ? '💰' : '💸'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-slate-800 text-sm leading-tight">{t.category}</h4>
+                                        <p className="text-[10px] text-slate-400 font-medium">
+                                            {new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {t.type === 'income' ? '+' : '-'}₹{t.amount.toLocaleString()}
+                                </p>
+                            </div>
+                        ))
                     )}
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
+                {listStyle === 'all' && totalPages > 1 && (
                     <div className="flex items-center justify-center gap-4 pb-8">
                         <button
                             disabled={currentPage === 1}
